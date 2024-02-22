@@ -1,17 +1,3 @@
-// Copyright (c) 2021 by Rockchip Electronics Co., Ltd. All Rights Reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 #include "yolov8.h"
 
 #include <math.h>
@@ -23,7 +9,7 @@
 
 #include <set>
 #include <vector>
-#define LABEL_NALE_TXT_PATH "./model/coco_80_labels_list.txt"
+#define LABEL_NALE_TXT_PATH "../model/coco_80_labels_list.txt"
 
 static char *labels[OBJ_CLASS_NUM];
 
@@ -91,7 +77,6 @@ static int readLines(const char *fileName, char *lines[], int max_line)
 
 static int loadLabelName(const char *locationFilename, char *label[])
 {
-    printf("load lable %s\n", locationFilename);
     readLines(locationFilename, label, OBJ_CLASS_NUM);
     return 0;
 }
@@ -236,7 +221,6 @@ static int process_i8(int8_t *box_tensor, int32_t box_zp, float box_scale,
             int offset = i* grid_w + j;
             int max_class_id = -1;
 
-            // 通过 score sum 起到快速过滤的作用
             if (score_sum_tensor != nullptr){
                 if (score_sum_tensor[offset] < score_sum_thres_i8){
                     continue;
@@ -301,7 +285,6 @@ static int process_fp32(float *box_tensor, float *score_tensor, float *score_sum
             int offset = i* grid_w + j;
             int max_class_id = -1;
 
-            // 通过 score sum 起到快速过滤的作用
             if (score_sum_tensor != nullptr){
                 if (score_sum_tensor[offset] < threshold){
                     continue;

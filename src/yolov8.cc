@@ -47,10 +47,7 @@ int init_yolov8_model(const char *model_path, rknn_app_context_t *app_ctx)
         printf("rknn_query fail! ret=%d\n", ret);
         return -1;
     }
-    printf("model input num: %d, output num: %d\n", io_num.n_input, io_num.n_output);
-
     // Get Model Input Info
-    printf("input tensors:\n");
     rknn_tensor_attr input_attrs[io_num.n_input];
     memset(input_attrs, 0, sizeof(input_attrs));
     for (int i = 0; i < io_num.n_input; i++)
@@ -65,8 +62,6 @@ int init_yolov8_model(const char *model_path, rknn_app_context_t *app_ctx)
         dump_tensor_attr(&(input_attrs[i]));
     }
 
-    // Get Model Output Info
-    printf("output tensors:\n");
     rknn_tensor_attr output_attrs[io_num.n_output];
     memset(output_attrs, 0, sizeof(output_attrs));
     for (int i = 0; i < io_num.n_output; i++)
@@ -147,8 +142,8 @@ int inference_yolov8_model(rknn_app_context_t *app_ctx, image_buffer_t *img, obj
     letterbox_t letter_box;
     rknn_input inputs[app_ctx->io_num.n_input];
     rknn_output outputs[app_ctx->io_num.n_output];
-    const float nms_threshold = NMS_THRESH;      // 默认的NMS阈值
-    const float box_conf_threshold = BOX_THRESH; // 默认的置信度阈值
+    const float nms_threshold = NMS_THRESH;     
+    const float box_conf_threshold = BOX_THRESH;
     int bg_color = 114;
 
     if ((!app_ctx) || !(img) || (!od_results))
@@ -197,7 +192,6 @@ int inference_yolov8_model(rknn_app_context_t *app_ctx, image_buffer_t *img, obj
     }
 
     // Run
-    printf("rknn_run\n");
     ret = rknn_run(app_ctx->rknn_ctx, nullptr);
     if (ret < 0)
     {

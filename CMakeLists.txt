@@ -19,6 +19,8 @@ set(RKNN_RT_LIB ${RKNN_API_PATH}/aarch64/librknnrt.so)
 include_directories(${RKNN_API_PATH}/include)
 set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
 
+find_package(OpenCV REQUIRED)
+
 file(GLOB SRCS ${CMAKE_CURRENT_SOURCE_DIR}/*.cc)
 
 add_executable(${PROJECT_NAME}
@@ -33,6 +35,16 @@ target_link_libraries(${PROJECT_NAME}
     imagedrawing
     ${RKNN_RT_LIB}    
     ${LIBRKNNRT}
+    ${OpenCV_LIBS}
+)
+
+# Webcam test
+add_executable(webcam_test
+    webcam_test.cc
+)
+
+target_link_libraries(webcam_test
+    ${OpenCV_LIBS}
 )
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Android")

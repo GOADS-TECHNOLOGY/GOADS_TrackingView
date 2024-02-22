@@ -92,7 +92,6 @@ static int read_image_jpeg(const char* path, image_buffer_t* image)
         return -1;
     }
 
-    // 对图像做裁剪16对齐，利于后续rga操作
     int crop_width = origin_width / 16 * 16;
     int crop_height = origin_height / 16 * 16;
 
@@ -118,7 +117,6 @@ static int read_image_jpeg(const char* path, image_buffer_t* image)
 
     flags |= 0;
 
-    // 错误码为0时，表示警告，错误码为-1时表示错误
     int pixelFormat = TJPF_RGB;
     ret = tjDecompress2(handle, jpegBuf, size, sw_out_buf, width, 0, height, pixelFormat, flags);
     // ret = tjDecompressToYUV2(handle, jpeg_buf, size, dst_buf, *width, padding, *height, flags);
@@ -211,7 +209,6 @@ static int write_image_jpeg(const char* path, int quality, const image_buffer_t*
 
 static int read_image_stb(const char* path, image_buffer_t* image)
 {
-    // 默认图像为3通道
     int w, h, c;
     unsigned char* pixeldata = stbi_load(path, &w, &h, &c, 0);
     if (!pixeldata) {
@@ -221,7 +218,6 @@ static int read_image_stb(const char* path, image_buffer_t* image)
     // printf("load image wxhxc=%dx%dx%d path=%s\n", w, h, c, path);
     int size = w * h * c;
 
-    // 设置图像数据
     if (image->virt_addr != NULL) {
         memcpy(image->virt_addr, pixeldata, size);
         stbi_image_free(pixeldata);
@@ -306,7 +302,6 @@ static int crop_and_scale_image_c(int channel, unsigned char *src, int src_width
     //     dst_width, dst_height, dst_box_x, dst_box_y, dst_box_width, dst_box_height);
     // printf("channel=%d x_ratio=%f y_ratio=%f\n", channel, x_ratio, y_ratio);
 
-    // 从原图指定区域取数据，双线性缩放到目标指定区域
     for (int dst_y = dst_box_y; dst_y < dst_box_y + dst_box_height; dst_y++) {
         for (int dst_x = dst_box_x; dst_x < dst_box_x + dst_box_width; dst_x++) {
             int dst_x_offset = dst_x - dst_box_x;
@@ -321,13 +316,11 @@ static int crop_and_scale_image_c(int channel, unsigned char *src, int src_width
             int index1 = src_y * src_width * channel + src_x * channel;
             int index2 = index1 + src_width * channel;    // down
             if (src_y == src_height - 1) {
-                // 如果到图像最下边缘，变成选择上面的像素
                 index2 = index1 - src_width * channel;
             }
             int index3 = index1 + 1 * channel;            // right
             int index4 = index2 + 1 * channel;            // down right
             if (src_x == src_width - 1) {
-                // 如果到图像最右边缘，变成选择左边的像素
                 index3 = index1 - 1 * channel;
                 index4 = index2 - 1 * channel;
             }
@@ -628,8 +621,8 @@ static int convert_image_rga(image_buffer_t* src_img, image_buffer_t* dst_img, i
         p_imcolor[1] = color;
         p_imcolor[2] = color;
         p_imcolor[3] = color;
-        printf("fill dst image (x y w h)=(%d %d %d %d) with color=0x%x\n",
-            dst_whole_rect.x, dst_whole_rect.y, dst_whole_rect.width, dst_whole_rect.height, imcolor);
+        // printf("fill dst image (x y w h)=(%d %d %d %d) with color=0x%x\n",
+        //     dst_whole_rect.x, dst_whole_rect.y, dst_whole_rect.width, dst_whole_rect.height, imcolor);
         ret_rga = imfill(rga_buf_dst, dst_whole_rect, imcolor);
         if (ret_rga <= 0) {
             if (dst != NULL) {
@@ -666,17 +659,16 @@ int convert_image(image_buffer_t* src_img, image_buffer_t* dst_img, image_rect_t
 {
     int ret;
  
-    printf("src width=%d height=%d fmt=0x%x virAddr=0x%p fd=%d\n",
-        src_img->width, src_img->height, src_img->format, src_img->virt_addr, src_img->fd);
-    printf("dst width=%d height=%d fmt=0x%x virAddr=0x%p fd=%d\n",
-        dst_img->width, dst_img->height, dst_img->format, dst_img->virt_addr, dst_img->fd);
-    if (src_box != NULL) {
-        printf("src_box=(%d %d %d %d)\n", src_box->left, src_box->top, src_box->right, src_box->bottom);
-    }
-    if (dst_box != NULL) {
-        printf("dst_box=(%d %d %d %d)\n", dst_box->left, dst_box->top, dst_box->right, dst_box->bottom);
-    }
-    printf("color=0x%x\n", color);
+    // printf("src width=%d height=%d fmt=0x%x virAddr=0x%p fd=%d\n",
+    //     src_img->width, src_img->height, src_img->format, src_img->virt_addr, src_img->fd);
+    // printf("dst width=%d height=%d fmt=0x%x virAddr=0x%p fd=%d\n",
+    //     dst_img->width, dst_img->height, dst_img->format, dst_img->virt_addr, dst_img->fd);
+    // if (src_box != NULL) {
+    //     printf("src_box=(%d %d %d %d)\n", src_box->left, src_box->top, src_box->right, src_box->bottom);
+    // }
+    // if (dst_box != NULL) {
+    //     printf("dst_box=(%d %d %d %d)\n", dst_box->left, dst_box->top, dst_box->right, dst_box->bottom);
+    // }
 
     ret = convert_image_rga(src_img, dst_img, src_box, dst_box, color);
     if (ret != 0) {
@@ -757,9 +749,9 @@ int convert_image_with_letterbox(image_buffer_t* src_image, image_buffer_t* dst_
         dst_box.right = dst_box.left + resize_w - 1;
         _left_offset = dst_box.left;
     }
-    printf("scale=%f dst_box=(%d %d %d %d) allow_slight_change=%d _left_offset=%d _top_offset=%d padding_w=%d padding_h=%d\n",
-        scale, dst_box.left, dst_box.top, dst_box.right, dst_box.bottom, allow_slight_change,
-        _left_offset, _top_offset, padding_w, padding_h);
+    // printf("scale=%f dst_box=(%d %d %d %d) allow_slight_change=%d _left_offset=%d _top_offset=%d padding_w=%d padding_h=%d\n",
+    //     scale, dst_box.left, dst_box.top, dst_box.right, dst_box.bottom, allow_slight_change,
+    //     _left_offset, _top_offset, padding_w, padding_h);
 
     //set offset and scale
     if(letterbox != NULL){
