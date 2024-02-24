@@ -1,4 +1,5 @@
 #include "yolov8.h"
+#include "bytetracker.h"
 #include <opencv2/opencv.hpp>
 #include <iostream>
 
@@ -52,6 +53,9 @@ int main() {
         return -1;
     }
 
+    // Initialize Tracker
+    BYTETracker tracker;
+
     // Initialize camera
     cv::VideoCapture cap(0); // Open default camera
     if (!cap.isOpened()) {
@@ -82,13 +86,40 @@ int main() {
             break;
         }
 
-        // Process detection results
+        vector<Object> tracked_objects;
         for (int i = 0; i < od_results.count; i++) {
             object_detect_result* det_result = &(od_results.results[i]);
-            printf("[DET] %s @ (%d %d %d %d) %.3f\n", det_result->cls_id ? "unknow" : "person",
-               det_result->box.left, det_result->box.top,
-               det_result->box.right, det_result->box.bottom,
-               det_result->prop);
+
+            // Convert detection result to an Object struct
+            Object obj;
+            obj.rect = cv::Rect_<float>(det_result->box.left, det_result->box.top,
+                                        det_result->box.right - det_result->box.left, 
+                                        det_result->box.bottom - det_result->box.top); // Convert to cv::Rect
+            obj.label = det_result->cls_id; // Use cls_id as the label
+            obj.prob = det_result->prop; // Use prop as the probability
+
+            // Add the object to the vector
+            tracked_objects.push_back(obj);
+        }
+
+        // Assuming `tracker` is a ByteTrack instance you've initialized
+        vector<STrack> output_stracks = tracker.update(tracked_objects);
+        
+        int active_trackers_count = 0;
+        for (int i = 0; i < output_stracks.size(); i++)
+		{
+			vector<float> tlwh = output_stracks[i].tlwh;
+			bool vertical = tlwh[2] / tlwh[3] > 1.6;
+			if (tlwh[2] * tlwh[3] > 20 && !vertical)
+			{
+                active_trackers_count++; 
+                printf("[TRACK ID] %d - %s @ %.3f\n", output_stracks[i].track_id, "person", output_stracks[i].score);
+			}
+		}
+
+        if(active_trackers_count != 0)
+        {
+            printf("[DEBUG] Active trackers count: %d\n", active_trackers_count);
         }
 
         freeImageBuffer(img);

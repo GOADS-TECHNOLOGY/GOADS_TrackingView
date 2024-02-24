@@ -238,7 +238,7 @@ static int process_i8(int8_t *box_tensor, int32_t box_zp, float box_scale,
             }
 
             // compute box
-            if (max_score> score_thres_i8){
+            if (max_score> score_thres_i8 && max_class_id == 0){
                 offset = i* grid_w + j;
                 float box[4];
                 float before_dfl[dfl_len*4];
@@ -302,7 +302,7 @@ static int process_fp32(float *box_tensor, float *score_tensor, float *score_sum
             }
 
             // compute box
-            if (max_score> threshold){
+            if (max_score> threshold && max_class_id == 0){
                 offset = i* grid_w + j;
                 float box[4];
                 float before_dfl[dfl_len*4];
@@ -451,9 +451,11 @@ int init_post_process()
 char *coco_cls_to_name(int cls_id)
 {
 
+    char* result = new char[5];
+    strcpy(result, "null");
     if (cls_id >= OBJ_CLASS_NUM)
     {
-        return "null";
+        return result;
     }
 
     if (labels[cls_id])
@@ -461,7 +463,7 @@ char *coco_cls_to_name(int cls_id)
         return labels[cls_id];
     }
 
-    return "null";
+    return result;
 }
 
 void deinit_post_process()
