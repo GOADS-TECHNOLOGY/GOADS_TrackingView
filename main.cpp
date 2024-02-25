@@ -135,24 +135,33 @@ int main() {
             printf("[DEBUG] Active trackers count: %d\n", active_trackers_count);
         }
         
-        auto now = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = now - last_send_time;
-        if (elapsed.count() >= 15.0) { // Check if 15 seconds have passed
-            std::ostringstream oss;
-            oss << unique_ids.size();
-            std::string count_str = oss.str();
-            zmq::message_t message(count_str.size());
-            memcpy(message.data(), count_str.data(), count_str.size());
-            publisher.send(message);
+        // auto now = std::chrono::high_resolution_clock::now();
+        // std::chrono::duration<double> elapsed = now - last_send_time;
+        // if (elapsed.count() >= 15.0) { // Check if 15 seconds have passed
+        //     std::ostringstream oss;
+        //     oss << unique_ids.size();
+        //     std::string count_str = oss.str();
+        //     zmq::message_t message(count_str.size());
+        //     memcpy(message.data(), count_str.data(), count_str.size());
+        //     publisher.send(message);
             
-            printf("[INFO] Publish people count: %lu\n", unique_ids.size());
+        //     printf("[INFO] Publish people count: %lu\n", unique_ids.size());
             
-            unique_ids.clear(); // Clear unique memory
-            last_send_time = now; // Reset the timer
-        }
+        //     unique_ids.clear(); // Clear unique memory
+        //     last_send_time = now; // Reset the timer
+        // }
 
-        printf("[DEBUG] Unique people count: %lu\n", unique_ids.size());
-
+        std::ostringstream oss;
+        //Draw data
+        //oss << unique_ids.size();
+        //Activate data
+        oss << active_trackers_count;
+        std::string count_str = oss.str();
+        zmq::message_t message(count_str.size());
+        memcpy(message.data(), count_str.data(), count_str.size());
+        publisher.send(message);
+        printf("[INFO] Publish people count: %lu\n", unique_ids.size());
+        
         // Break the loop if 'q' is pressed
         if (cv::waitKey(1) == 'q') {
             break;
