@@ -12,8 +12,6 @@ endif ()
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/utils)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-
 set(RKNN_API_PATH ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/runtime/RK356X/Linux/librknn_api)
 set(RKNN_RT_LIB ${RKNN_API_PATH}/aarch64/librknnrt.so)
 include_directories(${RKNN_API_PATH}/include)
@@ -21,12 +19,23 @@ set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
 
 find_package(OpenCV REQUIRED)
 
+find_package(cppzmq)
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(/usr/local/include/eigen3)
+include_directories(${cppzmq_INCLUDE_DIR})
+
 file(GLOB SRCS ${CMAKE_CURRENT_SOURCE_DIR}/*.cc)
 
 add_executable(${PROJECT_NAME}
-    main.cc
-    src/postprocess.cc
-    src/yolov8.cc
+    main.cpp
+    src/postprocess.cpp
+    src/yolov8.cpp
+    src/bytetracker.cpp
+    src/kalmanfilter.cpp
+    src/strack.cpp
+    src/lapjv.cpp
+    src/utils.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -36,15 +45,25 @@ target_link_libraries(${PROJECT_NAME}
     ${RKNN_RT_LIB}    
     ${LIBRKNNRT}
     ${OpenCV_LIBS}
+    cppzmq
 )
 
 # Webcam test
 add_executable(webcam_test
-    webcam_test.cc
+    webcam_test.cpp
 )
 
 target_link_libraries(webcam_test
     ${OpenCV_LIBS}
+)
+
+# ZMQ test
+add_executable(zmq_test
+    subcrise_zmq.cpp
+)
+
+target_link_libraries(zmq_test
+    cppzmq
 )
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Android")
@@ -63,6 +82,7 @@ endif()
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${LIBRKNNRT_INCLUDES}
+    ${cppzmq_INCLUDE_DIR}
 )
 
 install(TARGETS ${PROJECT_NAME} DESTINATION .)

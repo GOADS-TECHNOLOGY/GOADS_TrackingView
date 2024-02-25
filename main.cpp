@@ -1,6 +1,10 @@
 #include "yolov8.h"
+#include "bytetracker.h"
 #include <opencv2/opencv.hpp>
 #include <iostream>
+#include <zmq.hpp>
+#include <chrono>
+#include <thread>
 
 image_buffer_t convertMatToImageBuffer(const cv::Mat& frame) {
     image_buffer_t buffer;
@@ -52,6 +56,9 @@ int main() {
         return -1;
     }
 
+    // Initialize Tracker
+    BYTETracker tracker;
+
     // Initialize camera
     cv::VideoCapture cap(0); // Open default camera
     if (!cap.isOpened()) {
@@ -59,8 +66,14 @@ int main() {
         release_yolov8_model(&rknn_app_ctx);
         return -1;
     }
+    
+    zmq::context_t context(1);
+    zmq::socket_t publisher(context, ZMQ_PUB);
+    publisher.bind("tcp://*:140799");
 
+    std::set<int> unique_ids;
     // Loop to continuously perform object detection
+    auto last_send_time = std::chrono::high_resolution_clock::now();
     while (true) {
         // Capture frame from camera
         cv::Mat frame;
@@ -82,16 +95,63 @@ int main() {
             break;
         }
 
-        // Process detection results
+        vector<Object> tracked_objects;
         for (int i = 0; i < od_results.count; i++) {
             object_detect_result* det_result = &(od_results.results[i]);
-            printf("[DET] %s @ (%d %d %d %d) %.3f\n", det_result->cls_id ? "unknow" : "person",
-               det_result->box.left, det_result->box.top,
-               det_result->box.right, det_result->box.bottom,
-               det_result->prop);
+
+            // Convert detection result to an Object struct
+            Object obj;
+            obj.rect = cv::Rect_<float>(det_result->box.left, det_result->box.top,
+                                        det_result->box.right - det_result->box.left, 
+                                        det_result->box.bottom - det_result->box.top); // Convert to cv::Rect
+            obj.label = det_result->cls_id; // Use cls_id as the label
+            obj.prob = det_result->prop; // Use prop as the probability
+
+            // Add the object to the vector
+            tracked_objects.push_back(obj);
         }
 
+        // Assuming `tracker` is a ByteTrack instance you've initialized
+        vector<STrack> output_stracks = tracker.update(tracked_objects);
+        
+        int active_trackers_count = 0;
+        for (int i = 0; i < output_stracks.size(); i++)
+		{
+			vector<float> tlwh = output_stracks[i].tlwh;
+			bool vertical = tlwh[2] / tlwh[3] > 1.6;
+			if (tlwh[2] * tlwh[3] > 20 && !vertical)
+			{
+                active_trackers_count++; 
+                unique_ids.insert(output_stracks[i].track_id);
+                printf("[TRACK ID] %d - %s @ %.3f\n", output_stracks[i].track_id, "person", output_stracks[i].score);
+			}
+		}
+
+        // free memory
         freeImageBuffer(img);
+        
+        if(active_trackers_count != 0)
+        {
+            printf("[DEBUG] Active trackers count: %d\n", active_trackers_count);
+        }
+        
+        auto now = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = now - last_send_time;
+        if (elapsed.count() >= 15.0) { // Check if 15 seconds have passed
+            std::ostringstream oss;
+            oss << unique_ids.size();
+            std::string count_str = oss.str();
+            zmq::message_t message(count_str.size());
+            memcpy(message.data(), count_str.data(), count_str.size());
+            publisher.send(message);
+            
+            printf("[INFO] Publish people count: %lu\n", unique_ids.size());
+            
+            unique_ids.clear(); // Clear unique memory
+            last_send_time = now; // Reset the timer
+        }
+
+        printf("[DEBUG] Unique people count: %lu\n", unique_ids.size());
 
         // Break the loop if 'q' is pressed
         if (cv::waitKey(1) == 'q') {
