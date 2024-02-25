@@ -2,6 +2,9 @@
 #include "bytetracker.h"
 #include <opencv2/opencv.hpp>
 #include <iostream>
+#include <zmq.hpp>
+#include <chrono>
+#include <thread>
 
 image_buffer_t convertMatToImageBuffer(const cv::Mat& frame) {
     image_buffer_t buffer;
@@ -63,8 +66,14 @@ int main() {
         release_yolov8_model(&rknn_app_ctx);
         return -1;
     }
+    
+    zmq::context_t context(1);
+    zmq::socket_t publisher(context, ZMQ_PUB);
+    publisher.bind("tcp://*:140799");
 
+    std::set<int> unique_ids;
     // Loop to continuously perform object detection
+    auto last_send_time = std::chrono::high_resolution_clock::now();
     while (true) {
         // Capture frame from camera
         cv::Mat frame;
@@ -113,16 +122,36 @@ int main() {
 			if (tlwh[2] * tlwh[3] > 20 && !vertical)
 			{
                 active_trackers_count++; 
+                unique_ids.insert(output_stracks[i].track_id);
                 printf("[TRACK ID] %d - %s @ %.3f\n", output_stracks[i].track_id, "person", output_stracks[i].score);
 			}
 		}
 
+        // free memory
+        freeImageBuffer(img);
+        
         if(active_trackers_count != 0)
         {
             printf("[DEBUG] Active trackers count: %d\n", active_trackers_count);
         }
+        
+        auto now = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = now - last_send_time;
+        if (elapsed.count() >= 15.0) { // Check if 15 seconds have passed
+            std::ostringstream oss;
+            oss << unique_ids.size();
+            std::string count_str = oss.str();
+            zmq::message_t message(count_str.size());
+            memcpy(message.data(), count_str.data(), count_str.size());
+            publisher.send(message);
+            
+            printf("[INFO] Publish people count: %lu\n", unique_ids.size());
+            
+            unique_ids.clear(); // Clear unique memory
+            last_send_time = now; // Reset the timer
+        }
 
-        freeImageBuffer(img);
+        printf("[DEBUG] Unique people count: %lu\n", unique_ids.size());
 
         // Break the loop if 'q' is pressed
         if (cv::waitKey(1) == 'q') {
