@@ -159,7 +159,7 @@ int main() {
         std::string count_str = oss.str();
         zmq::message_t message(count_str.size());
         memcpy(message.data(), count_str.data(), count_str.size());
-        publisher.send(message);
+        publisher.send(message, zmq::send_flags::none);
         printf("[INFO] Publish people count: %lu\n", unique_ids.size());
         
         // Break the loop if 'q' is pressed

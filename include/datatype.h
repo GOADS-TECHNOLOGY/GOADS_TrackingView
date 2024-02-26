@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <vector>
 
+#undef U
 #include <Eigen/Core>
 #include <Eigen/Dense>
 typedef Eigen::Matrix<float, 1, 4, Eigen::RowMajor> DETECTBOX;

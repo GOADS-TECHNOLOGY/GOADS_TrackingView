@@ -38,3 +38,9 @@ target_include_directories(imageutils PUBLIC
     ${LIBJPEG_INCLUDES}
     ${LIBRGA_INCLUDES}
 )
+
+# file(GLOB UTILS_LIB "${CMAKE_CURRENT_SOURCE_DIR}/build/utils/*.a")
+# install(FILES ${UTILS_LIB} DESTINATION lib)
+install(TARGETS fileutils imagedrawing imageutils
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib)
