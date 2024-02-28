@@ -21,7 +21,6 @@ include_directories(${RKNN_API_PATH}/include)
 set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
 
 find_package(OpenCV REQUIRED)
-find_package(cppzmq)
 
 message(${OpenCV_INCLUDE_DIRS})
 
@@ -49,7 +48,6 @@ target_link_libraries(${PROJECT_NAME}
     ${RKNN_RT_LIB}    
     ${LIBRKNNRT}
     ${OpenCV_LIBS}
-    cppzmq
 )
 
 add_executable(${PROJECT_NAME}_test
@@ -67,15 +65,6 @@ add_executable(webcam_test
 
 target_link_libraries(webcam_test
     ${OpenCV_LIBS}
-)
-
-# ZMQ test
-add_executable(subcrise_zmq_test
-    subcrise_zmq.cpp
-)
-
-target_link_libraries(subcrise_zmq_test
-    cppzmq
 )
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Android")
