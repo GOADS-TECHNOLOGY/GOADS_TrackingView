@@ -30,13 +30,13 @@ file(GLOB RKNN_HEADER_FILES ${RKNN_API_PATH}/include/*.h)
 file(GLOB UTILS_HEADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/utils/*.h)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories(/usr/local/include/eigen3)
+include_directories(/usr/include/eigen3)
 
 add_library(${PROJECT_NAME} SHARED ${SRCS})
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    /usr/local/include/eigen3
+    /usr/include/eigen3
     ${LIBRKNNRT_INCLUDES}
     ${cppzmq_INCLUDE_DIR}
 )
