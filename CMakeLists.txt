@@ -22,8 +22,6 @@ set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
 
 find_package(OpenCV REQUIRED)
 
-message(${OpenCV_INCLUDE_DIRS})
-
 file(GLOB SRCS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 file(GLOB HEADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h)
 file(GLOB RKNN_HEADER_FILES ${RKNN_API_PATH}/include/*.h)
