@@ -92,7 +92,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(${PROJECT_NAME} Threads::Threads)
 endif()
 
-set_target_properties(${PROJECT_NAME} PROPERTIES INSTALL_RPATH "/usr/local/lib")
+set_target_properties(${PROJECT_NAME} PROPERTIES INSTALL_RPATH "/usr/local/lib:/usr/lib")
 
 install(TARGETS ${PROJECT_NAME} DESTINATION lib)
 install(FILES ${HEADER_FILES} DESTINATION include/${PROJECT_NAME})

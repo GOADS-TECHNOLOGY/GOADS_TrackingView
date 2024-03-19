@@ -9,16 +9,13 @@ image_buffer_t convertMatToImageBuffer(const cv::Mat& frame) {
     image_buffer_t buffer;
     memset(&buffer, 0, sizeof(image_buffer_t));
 
-    // Fill in image width, height, and other relevant information
     buffer.width = frame.cols;
     buffer.height = frame.rows;
     buffer.width_stride = frame.cols;
     buffer.height_stride = frame.rows;
-    buffer.format = IMAGE_FORMAT_RGB888; // Assuming the input frame is in BGR format
+    buffer.format = IMAGE_FORMAT_RGB888;
     buffer.size = frame.total() * frame.elemSize();
     buffer.virt_addr = new unsigned char[buffer.size];
-
-    // Copy pixel data from the OpenCV frame to the image_buffer_t structure
     memcpy(buffer.virt_addr, frame.data, buffer.size);
 
     return buffer;
@@ -41,7 +38,7 @@ const char* getClassName(int cls_id) {
     if (it != class_names.end()) {
         return it->second;
     } else {
-        return "unknown"; // or handle unknown class id differently
+        return "unknown"; 
     }
 }
 
