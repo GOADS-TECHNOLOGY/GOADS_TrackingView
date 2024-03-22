@@ -9,23 +9,6 @@ if (ENABLE_ASAN)
 	set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 endif ()
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_SYSTEM_PROCESSOR aarch64)
-
-# Specify the cross compiler locations
-set(CMAKE_C_COMPILER /usr/bin/aarch64-linux-gnu-gcc)
-set(CMAKE_CXX_COMPILER /usr/bin/aarch64-linux-gnu-g++)
-
-set(CMAKE_FIND_ROOT_PATH /usr/aarch64-linux-gnu)
-
-# Adjust default behavior for the find commands
-set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/utils)
 
@@ -34,7 +17,7 @@ set(RKNN_RT_LIB ${RKNN_API_PATH}/aarch64/librknnrt.so)
 include_directories(${RKNN_API_PATH}/include)
 set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
 
-find_package(OpenCV REQUIRED)
+find_package(OpenCV)
 
 file(GLOB SRCS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 file(GLOB HEADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h)
