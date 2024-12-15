@@ -4,50 +4,36 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <unordered_set>
 
+// Convert OpenCV Mat to image_buffer_t without deep copying data
 image_buffer_t convertMatToImageBuffer(const cv::Mat& frame) {
-    image_buffer_t buffer;
-    memset(&buffer, 0, sizeof(image_buffer_t));
-
+    image_buffer_t buffer = {};
     buffer.width = frame.cols;
     buffer.height = frame.rows;
     buffer.width_stride = frame.cols;
     buffer.height_stride = frame.rows;
     buffer.format = IMAGE_FORMAT_RGB888;
     buffer.size = frame.total() * frame.elemSize();
-    buffer.virt_addr = new unsigned char[buffer.size];
-    memcpy(buffer.virt_addr, frame.data, buffer.size);
-
+    buffer.virt_addr = frame.data; // Point directly to Mat data, avoid copying
     return buffer;
 }
 
-void freeImageBuffer(image_buffer_t& buffer) {
-    if (buffer.virt_addr != nullptr) {
-        delete[] buffer.virt_addr;
-        buffer.virt_addr = nullptr;
-    }
-}
-
+// Use static map to avoid rebuilding it every time
 const char* getClassName(int cls_id) {
-    static std::unordered_map<int, const char*> class_names = {
+    static const std::unordered_map<int, const char*> class_names = {
         {0, "background"},
         {1, "person"},
     };
-
     auto it = class_names.find(cls_id);
-    if (it != class_names.end()) {
-        return it->second;
-    } else {
-        return "unknown"; 
-    }
+    return it != class_names.end() ? it->second : "unknown";
 }
 
 int main() {
     // Initialize YOLOv8 model
     rknn_app_context_t rknn_app_ctx;
     const char* model_path = "../model/yolov8.rknn"; // Provide the path to the YOLOv8 model file
-    int ret = init_yolov8_model(model_path, &rknn_app_ctx);
-    if (ret != 0) {
+    if (init_yolov8_model(model_path, &rknn_app_ctx) != 0) {
         std::cerr << "Failed to initialize YOLOv8 model." << std::endl;
         return -1;
     }
@@ -62,12 +48,9 @@ int main() {
         release_yolov8_model(&rknn_app_ctx);
         return -1;
     }
-    
-    std::set<int> unique_ids;
-    // Loop to continuously perform object detection
-    auto last_send_time = std::chrono::high_resolution_clock::now();
+
+    std::unordered_set<int> unique_ids; // Use unordered_set for fast ID tracking
     while (true) {
-        // Capture frame from camera
         cv::Mat frame;
         cap >> frame;
         if (frame.empty()) {
@@ -75,59 +58,56 @@ int main() {
             break;
         }
 
-        // Convert OpenCV frame to image_buffer_t
-        image_buffer_t img = convertMatToImageBuffer(frame);
-        // Implement function convertMatToImageBuffer to convert frame to img
+        // Convert frame to RGB if necessary
+        cv::cvtColor(frame, frame, cv::COLOR_BGR2RGB);
 
-        // Perform inference on YOLOv8 model
+        // Use frame data directly for inference
+        image_buffer_t img = convertMatToImageBuffer(frame);
+
+        // Perform inference
         object_detect_result_list od_results;
-        ret = inference_yolov8_model(&rknn_app_ctx, &img, &od_results);
-        if (ret != 0) {
+        if (inference_yolov8_model(&rknn_app_ctx, &img, &od_results) != 0) {
             std::cerr << "Failed to perform inference on YOLOv8 model." << std::endl;
             break;
         }
 
-        vector<Object> tracked_objects;
+        // Process detection results
+        std::vector<Object> tracked_objects;
         for (int i = 0; i < od_results.count; i++) {
-            object_detect_result* det_result = &(od_results.results[i]);
+            const auto& det_result = od_results.results[i];
+            if (det_result.prop < 0.5) continue; // Ignore low-confidence detections
 
-            // Convert detection result to an Object struct
-            Object obj;
-            obj.rect = cv::Rect_<float>(det_result->box.left, det_result->box.top,
-                                        det_result->box.right - det_result->box.left, 
-                                        det_result->box.bottom - det_result->box.top); // Convert to cv::Rect
-            obj.label = det_result->cls_id; // Use cls_id as the label
-            obj.prob = det_result->prop; // Use prop as the probability
-
-            // Add the object to the vector
-            tracked_objects.push_back(obj);
+            tracked_objects.push_back({
+                .rect = cv::Rect_<float>(
+                    det_result.box.left, det_result.box.top,
+                    det_result.box.right - det_result.box.left,
+                    det_result.box.bottom - det_result.box.top
+                ),
+                .label = det_result.cls_id,
+                .prob = det_result.prop
+            });
         }
 
-        // Assuming `tracker` is a ByteTrack instance you've initialized
-        vector<STrack> output_stracks = tracker.update(tracked_objects);
-        
+        // Update tracker
+        auto output_stracks = tracker.update(tracked_objects);
         int active_trackers_count = 0;
-        for (int i = 0; i < output_stracks.size(); i++)
-		{
-			vector<float> tlwh = output_stracks[i].tlwh;
-			bool vertical = tlwh[2] / tlwh[3] > 1.6;
-			if (tlwh[2] * tlwh[3] > 20 && !vertical)
-			{
-                active_trackers_count++; 
-                unique_ids.insert(output_stracks[i].track_id);
-                printf("[TRACK ID] %d - %s @ %.3f\n", output_stracks[i].track_id, "person", output_stracks[i].score);
-			}
-		}
 
-        // free memory
-        freeImageBuffer(img);
-        
-        if(active_trackers_count != 0)
-        {
-            printf("[DEBUG] Active trackers count: %d\n", active_trackers_count);
+        for (const auto& track : output_stracks) {
+            auto tlwh = track.tlwh;
+            bool is_valid = tlwh[2] * tlwh[3] > 20 && (tlwh[2] / tlwh[3] <= 1.6);
+            if (is_valid) {
+                active_trackers_count++;
+                unique_ids.insert(track.track_id);
+                std::cout << "[TRACK ID] " << track.track_id
+                          << " @ " << track.score << "\n";
+            }
         }
-        
-        // Break the loop if 'q' is pressed
+
+        // Debugging
+        if (active_trackers_count != 0) {
+            std::cout << "[DEBUG] Active trackers count: " << active_trackers_count << "\n";
+        }
+                // Break the loop if 'q' is pressed
         if (cv::waitKey(1) == 'q') {
             break;
         }
