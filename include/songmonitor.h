@@ -30,6 +30,8 @@ private:
     std::unordered_map<std::string, int> song_counts_;
     std::unordered_map<std::string, int> song_reach_map_; // Map lưu lượt tiếp cận
     std::mutex song_mutex_;
+
+    void sendDataToApi(const std::string& song_id, int play_count, int reach_count);
 };
 
 #endif // SONG_MONITOR_H

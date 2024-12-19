@@ -14,14 +14,33 @@ std::string FppApi::getSystemStatus() {
 
 std::string FppApi::getCurrentSongFileName() {
     std::string statusJson = getSystemStatus();
-    std::regex songRegex("\"current_song\":\s*\"(.*?)\"");
+    std::regex songRegex("\"current_song\":\\s*\"(.*?)\"");
     std::smatch match;
+
     if (std::regex_search(statusJson, match, songRegex) && match.size() > 1) {
         std::string fullPath = match.str(1);
         size_t pos = fullPath.find_last_of("/");
-        return (pos != std::string::npos) ? fullPath.substr(pos + 1) : fullPath;
+
+        // Lấy tên file (không chứa đường dẫn)
+        std::string fileName = (pos != std::string::npos) ? fullPath.substr(pos + 1) : fullPath;
+
+        // Loại bỏ phần mở rộng ".mp4" (nếu có)
+        size_t extPos = fileName.find_last_of(".");
+        if (extPos != std::string::npos && fileName.substr(extPos) == ".mp4") {
+            fileName = fileName.substr(0, extPos);
+        }
+
+        // Chuyển tên file sang số nguyên, nếu không được thì trả về "0"
+        try {
+            int fileNumber = std::stoi(fileName);
+            return std::to_string(fileNumber); // Trả về dạng chuỗi số nguyên
+        } catch (const std::exception& e) {
+            // Nếu không chuyển đổi được, trả về "0"
+            return "0";
+        }
     }
-    return "";
+
+    return "0"; // Trả về "0" nếu không tìm thấy bài hát
 }
 
 size_t FppApi::writeCallback(void* contents, size_t size, size_t nmemb, void* userp) {

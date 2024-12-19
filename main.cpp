@@ -104,7 +104,7 @@ int main() {
 
         // Break the loop if 'q' is pressed
         if (cv::waitKey(1) == 'q') {
-            break;`
+            break;
         }
     }
 

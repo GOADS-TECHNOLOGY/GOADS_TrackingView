@@ -8,7 +8,7 @@ extern std::atomic<bool> stop_api_thread;
 
 class FppApi {
 public:
-    explicit FppApi(const std::string& base_url = "http://172.17.0.1");
+    explicit FppApi(const std::string& base_url = "http://127.0.0.1");
      
     std::string getSystemStatus();
     std::string getCurrentSongFileName();
