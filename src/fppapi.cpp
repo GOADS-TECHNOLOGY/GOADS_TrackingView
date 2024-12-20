@@ -2,72 +2,100 @@
 #include <iostream>
 #include <regex>
 #include <curl/curl.h>
+#include <nlohmann/json.hpp>
 
-FppApi::FppApi(const std::string& base_url)
+FppApi::FppApi(const std::string &base_url)
     : base_url_(base_url) {}
 
-std::string FppApi::getSystemStatus() {
+std::string FppApi::getSystemStatus()
+{
     std::string endpoint = "/api/system/status";
     std::string url = base_url_ + endpoint;
     return performGetRequest(url);
 }
 
-std::string FppApi::getCurrentSongFileName() {
+std::tuple<int, std::string, int> FppApi::getSystemStatusDetails()
+{
     std::string statusJson = getSystemStatus();
-    std::regex songRegex("\"current_song\":\\s*\"(.*?)\"");
-    std::smatch match;
 
-    if (std::regex_search(statusJson, match, songRegex) && match.size() > 1) {
-        std::string fullPath = match.str(1);
-        size_t pos = fullPath.find_last_of("/");
+    try
+    {
+        // Phân tích JSON
+        nlohmann::json jsonData = nlohmann::json::parse(statusJson);
 
-        // Lấy tên file (không chứa đường dẫn)
-        std::string fileName = (pos != std::string::npos) ? fullPath.substr(pos + 1) : fullPath;
+        // Lấy current_song
+        std::string currentSongPath = jsonData.value("current_song", "");
+        int currentSong = 0;
 
-        // Loại bỏ phần mở rộng ".mp4" (nếu có)
-        size_t extPos = fileName.find_last_of(".");
-        if (extPos != std::string::npos && fileName.substr(extPos) == ".mp4") {
-            fileName = fileName.substr(0, extPos);
+        if (!currentSongPath.empty())
+        {
+            size_t pos = currentSongPath.find_last_of('/');
+            std::string fileName = (pos != std::string::npos) ? currentSongPath.substr(pos + 1) : currentSongPath;
+
+            // Loại bỏ phần mở rộng ".mp4"
+            size_t extPos = fileName.find_last_of('.');
+            if (extPos != std::string::npos && fileName.substr(extPos) == ".mp4")
+            {
+                fileName = fileName.substr(0, extPos);
+            }
+
+            // Chuyển đổi tên file sang số nguyên
+            try
+            {
+                currentSong = std::stoi(fileName);
+            }
+            catch (const std::exception &)
+            {
+                currentSong = 0; // Nếu không chuyển đổi được, đặt giá trị mặc định
+            }
         }
 
-        // Chuyển tên file sang số nguyên, nếu không được thì trả về "0"
-        try {
-            int fileNumber = std::stoi(fileName);
-            return std::to_string(fileNumber); // Trả về dạng chuỗi số nguyên
-        } catch (const std::exception& e) {
-            // Nếu không chuyển đổi được, trả về "0"
-            return "0";
-        }
+        // Lấy status_name
+        std::string statusName = jsonData.value("status_name", "idle");
+
+        // Lấy uptime
+        int uptime = jsonData.value("uptimeTotalSeconds", 0);
+
+        return {currentSong, statusName, uptime};
     }
-
-    return "0"; // Trả về "0" nếu không tìm thấy bài hát
+    catch (const nlohmann::json::exception &e)
+    {
+        std::cerr << "Error parsing JSON: " << e.what() << std::endl;
+        return {0, "idle", 0}; // Trả về giá trị mặc định khi gặp lỗi
+    }
 }
 
-size_t FppApi::writeCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+size_t FppApi::writeCallback(void *contents, size_t size, size_t nmemb, void *userp)
+{
     size_t totalSize = size * nmemb;
-    std::string* str = static_cast<std::string*>(userp);
-    str->append(static_cast<char*>(contents), totalSize);
+    std::string *str = static_cast<std::string *>(userp);
+    str->append(static_cast<char *>(contents), totalSize);
     return totalSize;
 }
 
-std::string FppApi::performGetRequest(const std::string& url) {
-    CURL* curl;
+std::string FppApi::performGetRequest(const std::string &url)
+{
+    CURL *curl;
     CURLcode res;
     std::string response;
 
     curl = curl_easy_init();
-    if (curl) {
+    if (curl)
+    {
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
         res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
+        if (res != CURLE_OK)
+        {
             std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
         }
 
         curl_easy_cleanup(curl);
-    } else {
+    }
+    else
+    {
         std::cerr << "Failed to initialize CURL" << std::endl;
     }
 
