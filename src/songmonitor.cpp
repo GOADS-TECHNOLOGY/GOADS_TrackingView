@@ -17,14 +17,27 @@ void SongMonitor::start()
 {
     stop_flag_ = false;
     monitor_thread_ = std::thread(&SongMonitor::monitor, this);
+    screen_thread_ = std::thread(&SongMonitor::sendDataToApiScreenThread, this);
+    api_thread_ = std::thread(&SongMonitor::sendDataToApiThread, this);
 }
 
 void SongMonitor::stop()
 {
     stop_flag_ = true;
+    cv_.notify_all();     // Thông báo để kết thúc thread
+    api_cv_.notify_all(); // Thông báo để kết thúc thread API
+
     if (monitor_thread_.joinable())
     {
         monitor_thread_.join();
+    }
+    if (screen_thread_.joinable())
+    {
+        screen_thread_.join();
+    }
+    if (api_thread_.joinable())
+    {
+        api_thread_.join();
     }
 }
 
@@ -54,13 +67,9 @@ void SongMonitor::monitor()
                     song_reach_map_[previous_song] = 0;
                 }
 
-                sendDataToApi(previous_song, song_counts_[previous_song], song_reach_map_[previous_song]);
+                enqueueApiData(previous_song, song_counts_[previous_song], song_reach_map_[previous_song]); // Đưa dữ liệu vào hàng đợi API
 
-                std::cout << "Song: " << previous_song
-                          << " played " << song_count << " times, reached "
-                          << song_reach_map_[previous_song] << " people.\n";
-
-                sendDataToApiScreen(current_song, status_name, uptime);
+                enqueueScreenData(current_song, status_name, uptime); // Đưa dữ liệu vào hàng đợi
 
                 // Reset details for the previous song
                 song_counts_[previous_song] = 0;
@@ -116,11 +125,11 @@ void SongMonitor::sendDataToApiScreen(int song_id, std::string &status_name, int
 
     // Tạo header cho request
     struct curl_slist *headers = nullptr;
-    headers = curl_slist_append(headers, "Authorization: 9dc5ec8c-2f2a-487b-9337-0aa585f69f9e");
+    headers = curl_slist_append(headers, "Authorization: a4311ee0-8159-4eba-a948-1d8da85a484f");
     headers = curl_slist_append(headers, "Content-Type: application/json");
 
     // Tạo URL
-    std::string url_put = "http://118.69.191.129:8000/api/screen/" + screen_id + "/status";
+    std::string url_put = "https://server.goads.com.vn/api/screen/" + screen_id + "/status";
 
     // Tạo dữ liệu JSON
     nlohmann::json data = {
@@ -177,19 +186,19 @@ void SongMonitor::sendDataToApi(int song_id, int play_count, int reach_count)
 
     // Tạo danh sách header
     struct curl_slist *headers = nullptr;
-    headers = curl_slist_append(headers, "Authorization: 9dc5ec8c-2f2a-487b-9337-0aa585f69f9e");
+    headers = curl_slist_append(headers, "Authorization: a4311ee0-8159-4eba-a948-1d8da85a484f");
     headers = curl_slist_append(headers, "Content-Type: application/json");
 
     // Dữ liệu JSON
     nlohmann::json data = {
-        {"screen_id", screen_id},
-        {"video_id", song_id}, // Chuyển song_id (chuỗi số) thành số nguyên
-        {"value", reach_count} // Số người nghe
+        {"screen", screen_id},
+        {"video", song_id},    // Chuyển song_id (chuỗi số) thành số nguyên
+        {"reach", reach_count} // Số người nghe
     };
 
     std::string json_data = data.dump();
 
-    curl_easy_setopt(curl, CURLOPT_URL, "http://118.69.191.129:8000/api/reach/create");
+    curl_easy_setopt(curl, CURLOPT_URL, "https://server.goads.com.vn/api/reach/create");
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -214,9 +223,8 @@ void SongMonitor::sendDataToApi(int song_id, int play_count, int reach_count)
 
 void SongMonitor::addReachToCurrentSong(int count)
 {
-    std::cout << "Count add " << count << std::endl;
     std::lock_guard<std::mutex> lock(song_mutex_);
-    if (current_song_ == -1)
+    if (current_song_ != -1)
     {
         song_reach_map_[current_song_] += count;
     }
@@ -232,4 +240,64 @@ std::unordered_map<int, int> SongMonitor::getSongReaches()
 {
     std::lock_guard<std::mutex> lock(song_mutex_);
     return song_reach_map_;
+}
+
+// Thêm hàm để đưa dữ liệu vào hàng đợi
+void SongMonitor::enqueueScreenData(int song_id, std::string &status_name, int uptime)
+{
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex_);
+        screen_data_queue_.emplace(song_id, status_name, uptime);
+    }
+    cv_.notify_one(); // Thông báo cho thread có dữ liệu mới
+}
+
+// Hàm xử lý thread riêng
+void SongMonitor::sendDataToApiScreenThread()
+{
+    while (!stop_flag_)
+    {
+        std::unique_lock<std::mutex> lock(queue_mutex_);
+        cv_.wait(lock, [this]
+                 { return !screen_data_queue_.empty() || stop_flag_; });
+
+        if (stop_flag_)
+            break;
+
+        // Lấy dữ liệu từ hàng đợi
+        auto [song_id, status_name, uptime] = screen_data_queue_.front();
+        screen_data_queue_.pop();
+        lock.unlock(); // Mở khóa mutex trước khi gửi dữ liệu
+
+        sendDataToApiScreen(song_id, status_name, uptime);
+    }
+}
+
+void SongMonitor::enqueueApiData(int song_id, int play_count, int reach_count)
+{
+    {
+        std::lock_guard<std::mutex> lock(api_queue_mutex_);
+        api_data_queue_.emplace(song_id, play_count, reach_count);
+    }
+    api_cv_.notify_one(); // Thông báo cho thread xử lý API
+}
+
+void SongMonitor::sendDataToApiThread()
+{
+    while (!stop_flag_)
+    {
+        std::unique_lock<std::mutex> lock(api_queue_mutex_);
+        api_cv_.wait(lock, [this]
+                     { return !api_data_queue_.empty() || stop_flag_; });
+
+        if (stop_flag_)
+            break;
+
+        // Lấy dữ liệu từ hàng đợi
+        auto [song_id, play_count, reach_count] = api_data_queue_.front();
+        api_data_queue_.pop();
+        lock.unlock(); // Mở khóa mutex trước khi gửi dữ liệu
+
+        sendDataToApi(song_id, play_count, reach_count);
+    }
 }

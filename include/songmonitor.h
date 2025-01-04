@@ -7,6 +7,8 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <queue>
+#include <condition_variable>
 
 class SongMonitor
 {
@@ -19,6 +21,8 @@ public:
     void addReachToCurrentSong(int count); // Thêm lượt tiếp cận
     std::unordered_map<int, int> getSongCounts();
     std::unordered_map<int, int> getSongReaches(); // Lấy lượt tiếp cận
+    void enqueueScreenData(int song_id, std::string &status_name, int uptime);
+    void enqueueApiData(int song_id, int play_count, int reach_count);
 
 private:
     void monitor();
@@ -26,6 +30,20 @@ private:
     FppApi &api_;
     std::atomic<bool> stop_flag_;
     std::thread monitor_thread_;
+
+    std::queue<std::tuple<int, std::string, int>> screen_data_queue_; // Hàng đợi lưu dữ liệu màn hình
+    std::mutex queue_mutex_;                                          // Mutex bảo vệ hàng đợi
+    std::condition_variable cv_;                                      // Biến điều kiện để thông báo thread
+    std::thread screen_thread_;                                       // Thread riêng cho sendDataToApiScreen
+
+    // Hàng đợi cho sendDataToApi
+    std::queue<std::tuple<int, int, int>> api_data_queue_;
+    std::mutex api_queue_mutex_;
+    std::condition_variable api_cv_;
+    std::thread api_thread_;
+
+    void sendDataToApiScreenThread();
+    void sendDataToApiThread();
 
     int current_song_;
     std::unordered_map<int, int> song_counts_;
