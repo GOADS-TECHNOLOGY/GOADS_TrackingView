@@ -4,7 +4,6 @@
 #include <thread>
 #include <unistd.h>
 #include <curl/curl.h>
-#include <nlohmann/json.hpp>
 
 SongMonitor::SongMonitor(FppApi &api) : api_(api), stop_flag_(false) {}
 
@@ -19,6 +18,7 @@ void SongMonitor::start()
     monitor_thread_ = std::thread(&SongMonitor::monitor, this);
     screen_thread_ = std::thread(&SongMonitor::sendDataToApiScreenThread, this);
     api_thread_ = std::thread(&SongMonitor::sendDataToApiThread, this);
+    retry_thread_ = std::thread(&SongMonitor::retrySendingData, this);
 }
 
 void SongMonitor::stop()
@@ -38,6 +38,10 @@ void SongMonitor::stop()
     if (api_thread_.joinable())
     {
         api_thread_.join();
+    }
+    if (retry_thread_.joinable())
+    {
+        retry_thread_.join();
     }
 }
 
@@ -105,6 +109,7 @@ void SongMonitor::sendDataToApiScreen(int song_id, std::string &status_name, int
 {
     CURL *curl;
     CURLcode res;
+    std::string ip = net.getIPAddress();
 
     // Lấy hostname làm screen_id
     char hostname[1024];
@@ -135,7 +140,8 @@ void SongMonitor::sendDataToApiScreen(int song_id, std::string &status_name, int
     nlohmann::json data = {
         {"current_song", song_id},
         {"status_name", status_name},
-        {"uptime", uptime}};
+        {"uptime", uptime},
+        {"ip_address", ip}};
 
     std::string json_data = data.dump();
 
@@ -152,13 +158,11 @@ void SongMonitor::sendDataToApiScreen(int song_id, std::string &status_name, int
     if (res != CURLE_OK)
     {
         std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
-        std::cerr << "Failed URL: " << url_put << std::endl;
-        std::cerr << "Payload: " << json_data << std::endl;
+        saveToTemporaryFile("temporary_screen_data.json", data);
     }
     else
     {
         std::cout << "Data sent to API successfully for screen ID: " << screen_id << std::endl;
-        std::cout << "Payload: " << json_data << std::endl;
     }
 
     // Dọn dẹp tài nguyên
@@ -210,6 +214,7 @@ void SongMonitor::sendDataToApi(int song_id, int play_count, int reach_count)
     if (res != CURLE_OK)
     {
         std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
+        saveToTemporaryFile("temporary_api_data.json", data);
     }
     else
     {
@@ -219,6 +224,91 @@ void SongMonitor::sendDataToApi(int song_id, int play_count, int reach_count)
     // Dọn dẹp CURL
     curl_slist_free_all(headers); // Giải phóng tài nguyên headers
     curl_easy_cleanup(curl);
+}
+
+bool SongMonitor::isNetworkAvailable()
+{
+    int res = system("ping -c 1 google.com > /dev/null 2>&1");
+    return res == 0;
+}
+
+void SongMonitor::retrySendingData()
+{
+    while (!stop_flag_)
+    {
+        if (isNetworkAvailable())
+        {
+            auto pending_data = readFromTemporaryFile("temporary_api_data.json");
+            for (const auto &data : pending_data)
+            {
+                try
+                {
+                    int song_id = data["video"];
+                    int reach = data["reach"];
+                    sendDataToApi(song_id, 0, reach);
+                }
+                catch (const std::exception &e)
+                {
+                    std::cerr << "Error retrying data: " << e.what() << std::endl;
+                }
+            }
+            clearTemporaryFile("temporary_api_data.json");
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(10));
+    }
+}
+
+void SongMonitor::saveToTemporaryFile(const std::string &filename, const nlohmann::json &data)
+{
+    std::ofstream file(filename, std::ios::app);
+    if (file.is_open())
+    {
+        file << data.dump() << std::endl;
+        file.close();
+    }
+    else
+    {
+        std::cerr << "Failed to open temporary file for writing: " << filename << std::endl;
+    }
+}
+
+std::vector<nlohmann::json> SongMonitor::readFromTemporaryFile(const std::string &filename)
+{
+    std::ifstream file(filename);
+    std::vector<nlohmann::json> data_list;
+
+    if (file.is_open())
+    {
+        std::string line;
+        while (std::getline(file, line))
+        {
+            try
+            {
+                data_list.push_back(nlohmann::json::parse(line));
+            }
+            catch (const std::exception &e)
+            {
+                std::cerr << "Error parsing JSON from temporary file: " << e.what() << std::endl;
+            }
+        }
+        file.close();
+    }
+    else
+    {
+        std::cerr << "Failed to open temporary file for reading: " << filename << std::endl;
+    }
+
+    return data_list;
+}
+
+void SongMonitor::clearTemporaryFile(const std::string &filename)
+{
+    std::ofstream file(filename, std::ios::trunc);
+    if (!file.is_open())
+    {
+        std::cerr << "Failed to clear temporary file: " << filename << std::endl;
+    }
+    file.close();
 }
 
 void SongMonitor::addReachToCurrentSong(int count)

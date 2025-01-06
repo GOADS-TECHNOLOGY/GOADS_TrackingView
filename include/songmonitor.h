@@ -9,6 +9,8 @@
 #include <mutex>
 #include <queue>
 #include <condition_variable>
+#include "network.h"
+#include <nlohmann/json.hpp>
 
 class SongMonitor
 {
@@ -28,8 +30,10 @@ private:
     void monitor();
 
     FppApi &api_;
+    Network net;
     std::atomic<bool> stop_flag_;
     std::thread monitor_thread_;
+    std::thread retry_thread_;
 
     std::queue<std::tuple<int, std::string, int>> screen_data_queue_; // Hàng đợi lưu dữ liệu màn hình
     std::mutex queue_mutex_;                                          // Mutex bảo vệ hàng đợi
@@ -52,6 +56,13 @@ private:
 
     void sendDataToApi(int song_id, int play_count, int reach_count);
     void sendDataToApiScreen(int song_id, std::string &status_name, int uptime);
+
+    void retrySendingData();
+
+    bool isNetworkAvailable();
+    void saveToTemporaryFile(const std::string &filename, const nlohmann::json &data);
+    std::vector<nlohmann::json> readFromTemporaryFile(const std::string &filename);
+    void clearTemporaryFile(const std::string &filename);
 };
 
 #endif // SONG_MONITOR_H
