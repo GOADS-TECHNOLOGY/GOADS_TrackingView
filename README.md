@@ -19,7 +19,32 @@ Dự án này có thể được sử dụng trong nhiều ứng dụng khác nh
 
 ## Cách build và run
 
+1. Tải các thư viện liên quan:
 
+`sudo apt update`
+
+`sudo apt-get install -y cmake make libopencv-dev libeigen3-dev libboost-system-dev libssl-dev libcrypto++-dev libcpprest-dev libboost-filesystem-dev libopencv-core-dev libopencv-imgproc-dev libopencv-highgui-dev libopencv-videoio-dev build-essential g++ libboost-all-dev libgtest-dev nlohmann-json3-dev openssl libbluetooth-dev libglib2.0-dev cmake libgraphicsmagick++-dev php-cli libboost-all-dev libtool libmicrohttpd-dev wireless-tools libiw-dev libzip-dev`
+
+```
+git clone https://github.com/etr/libhttpserver
+cd libhttpserver
+./bootstrap
+mkdir build
+cd build
+../configure
+make clean ; make -j ${CPUS} optimized
+make install
+```
+
+2. Cài đặt GoFPP
+```
+  sudo -s
+  git clone https://github.com/GOADS-TECHNOLOGY/gofpp.git
+  cd gofpp/SD/
+  ./FPP_Install.sh
+```
+
+- Đặt hotsname theo Serial Number của thiết bị phần cứng.
 
 ## Kết quả mong đợi
 
@@ -31,9 +56,3 @@ person @ (109 235 225 536) 0.866
 ```
 
 <img src="out.jpg">
-
-# Đóng góp bới
-
-1. Báo thủ số 1: [Nguyễn Trung Nhật](nhatnt@goads.vn)
-2. Báo thủ số 2:  [Phạm Ngọc Sang](sangpn@goads.vn)
-3. Báo thủ số 3: [Phạm Thanh Phong](phongpt@goads.vn)
