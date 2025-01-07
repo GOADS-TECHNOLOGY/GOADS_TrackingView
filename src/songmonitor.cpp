@@ -51,7 +51,7 @@ void SongMonitor::monitor()
         try
         {
             // Get current song, status, and uptime
-            auto [current_song, status_name, uptime] = api_.getSystemStatusDetails();
+            auto [current_song, status_name, uptime, ip] = api_.getSystemStatusDetails();
 
             std::cout << "Current song: " << current_song
                       << ", Status: " << status_name
@@ -69,7 +69,7 @@ void SongMonitor::monitor()
 
                 enqueueApiData(previous_song, song_counts_[previous_song], song_reach_map_[previous_song]); // Đưa dữ liệu vào hàng đợi API
 
-                enqueueScreenData(current_song, status_name, uptime); // Đưa dữ liệu vào hàng đợi
+                enqueueScreenData(current_song, status_name, uptime, ip); // Đưa dữ liệu vào hàng đợi
 
                 // Reset details for the previous song
                 song_counts_[previous_song] = 0;
@@ -101,7 +101,7 @@ void SongMonitor::monitor()
     }
 }
 
-void SongMonitor::sendDataToApiScreen(int song_id, std::string &status_name, int uptime)
+void SongMonitor::sendDataToApiScreen(int song_id, std::string &status_name, int uptime, std::string ip)
 {
     if (!isNetworkAvailable())
     {
@@ -110,7 +110,6 @@ void SongMonitor::sendDataToApiScreen(int song_id, std::string &status_name, int
 
     CURL *curl;
     CURLcode res;
-    std::string ip = net.getIPAddress();
 
     // Lấy hostname làm screen_id
     char hostname[1024];
@@ -255,11 +254,11 @@ std::unordered_map<int, int> SongMonitor::getSongReaches()
 }
 
 // Thêm hàm để đưa dữ liệu vào hàng đợi
-void SongMonitor::enqueueScreenData(int song_id, std::string &status_name, int uptime)
+void SongMonitor::enqueueScreenData(int song_id, std::string &status_name, int uptime, std::string ip)
 {
     {
         std::lock_guard<std::mutex> lock(queue_mutex_);
-        screen_data_queue_.emplace(song_id, status_name, uptime);
+        screen_data_queue_.emplace(song_id, status_name, uptime, ip);
     }
     cv_.notify_one(); // Thông báo cho thread có dữ liệu mới
 }
@@ -277,11 +276,11 @@ void SongMonitor::sendDataToApiScreenThread()
             break;
 
         // Lấy dữ liệu từ hàng đợi
-        auto [song_id, status_name, uptime] = screen_data_queue_.front();
+        auto [song_id, status_name, uptime, ip] = screen_data_queue_.front();
         screen_data_queue_.pop();
         lock.unlock(); // Mở khóa mutex trước khi gửi dữ liệu
 
-        sendDataToApiScreen(song_id, status_name, uptime);
+        sendDataToApiScreen(song_id, status_name, uptime, ip);
     }
 }
 
