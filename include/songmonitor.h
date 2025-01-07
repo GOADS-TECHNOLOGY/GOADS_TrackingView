@@ -22,7 +22,7 @@ public:
     void addReachToCurrentSong(int count); // Thêm lượt tiếp cận
     std::unordered_map<int, int> getSongCounts();
     std::unordered_map<int, int> getSongReaches(); // Lấy lượt tiếp cận
-    void enqueueScreenData(int song_id, std::string &status_name, int uptime);
+    void enqueueScreenData(int song_id, std::string &status_name, int uptime, std::string ip);
     void enqueueApiData(int song_id, int play_count, int reach_count);
 
 private:
@@ -33,7 +33,7 @@ private:
     std::atomic<bool> stop_flag_;
     std::thread monitor_thread_;
 
-    std::queue<std::tuple<int, std::string, int>> screen_data_queue_; // Hàng đợi lưu dữ liệu màn hình
+    std::queue<std::tuple<int, std::string, int, std::string>> screen_data_queue_; // Hàng đợi lưu dữ liệu màn hình
     std::mutex queue_mutex_;                                          // Mutex bảo vệ hàng đợi
     std::condition_variable cv_;                                      // Biến điều kiện để thông báo thread
     std::thread screen_thread_;                                       // Thread riêng cho sendDataToApiScreen
@@ -53,7 +53,7 @@ private:
     std::mutex song_mutex_;
 
     void sendDataToApi(int song_id, int play_count, int reach_count);
-    void sendDataToApiScreen(int song_id, std::string &status_name, int uptime);
+    void sendDataToApiScreen(int song_id, std::string &status_name, int uptime, std::string ip);
     bool isNetworkAvailable();
 };
 

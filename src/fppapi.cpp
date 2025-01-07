@@ -14,7 +14,7 @@ std::string FppApi::getSystemStatus()
     return performGetRequest(url);
 }
 
-std::tuple<int, std::string, int> FppApi::getSystemStatusDetails()
+std::tuple<int, std::string, int, std::string> FppApi::getSystemStatusDetails()
 {
     std::string statusJson = getSystemStatus();
 
@@ -56,12 +56,23 @@ std::tuple<int, std::string, int> FppApi::getSystemStatusDetails()
         // Lấy uptime
         int uptime = jsonData.value("uptimeTotalSeconds", 0);
 
-        return {currentSong, statusName, uptime};
+        // Lấy IPs từ advancedView
+        std::string ipAddress = ""; // Giá trị mặc định
+        if (jsonData.contains("advancedView") && jsonData["advancedView"].contains("IPs"))
+        {
+            auto ips = jsonData["advancedView"]["IPs"];
+            if (ips.is_array() && !ips.empty())
+            {
+                ipAddress = ips.dump(); // Chuyển cả mảng IPs thành chuỗi JSON
+            }
+        }
+
+        return {currentSong, statusName, uptime, ipAddress};
     }
     catch (const nlohmann::json::exception &e)
     {
         std::cerr << "Error parsing JSON: " << e.what() << std::endl;
-        return {0, "idle", 0}; // Trả về giá trị mặc định khi gặp lỗi
+        return {0, "idle", 0, ""}; // Trả về giá trị mặc định khi gặp lỗi
     }
 }
 

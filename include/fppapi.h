@@ -12,7 +12,7 @@ public:
     explicit FppApi(const std::string &base_url = "http://127.0.0.1");
 
     std::string getSystemStatus();
-    std::tuple<int, std::string, int> getSystemStatusDetails();
+    std::tuple<int, std::string, int, std::string> getSystemStatusDetails();
 
 private:
     std::string base_url_;
