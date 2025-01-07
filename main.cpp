@@ -41,7 +41,7 @@ int main()
 
     // Initialize YOLOv8 model
     rknn_app_context_t rknn_app_ctx;
-    const char *model_path = "../model/yolov8.rknn";
+    const char *model_path = "/usr/local/model/yolov8.rknn";
     if (init_yolov8_model(model_path, &rknn_app_ctx) != 0)
     {
         std::cerr << "Failed to initialize YOLOv8 model." << std::endl;
